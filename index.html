@@ -711,10 +711,14 @@ let downloads = null;
 const slug = (x) => (x || "").replace(/[^A-Za-z0-9-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
 const who = () => slug(state.pair) || slug([state.a, state.b].filter(Boolean).join("-")) || "pair";
 const fileName = () => state.view === "saga" ? `Valkyrie_Saga_${who()}_${today()}.png` : `Valkyrie_${slug(cur().name.replace("ú", "u"))}_${who()}_${state.date || "undated"}.png`;
-const canShareFiles = () => {
+// Phones that can share files. iPhone saves through the share sheet ("Save Image"); Android's share sheet has no plain
+// "save to gallery", so Android downloads the image instead and keeps Share as an optional button under the preview.
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const canShareAny = () => {
   try { return !window.claude && !!navigator.canShare && matchMedia("(pointer: coarse)").matches && navigator.canShare({ files: [new File([new Blob(["x"], { type: "image/png" })], "t.png", { type: "image/png" })] }); }
   catch (e) { return false; }
 };
+const canShareFiles = () => isIOS() && canShareAny();
 let ready = { key: null, blob: null }, lastBlob = null, renderTimer = null;
 const stateKey = () => JSON.stringify([state.view, state.exam, state.pair, state.a, state.b, state.ex, state.as, state.date, state.exams[state.exam], state.saga]);
 function scheduleRender() {
@@ -723,7 +727,7 @@ function scheduleRender() {
   renderTimer = setTimeout(async () => { const k = stateKey(); if (ready.key === k) return; try { const b = await renderPNG(); if (stateKey() === k) ready = { key: k, blob: b }; } catch (e) {} }, 900);
 }
 function setStatus(msg, err) { const el = $(state.view === "saga" ? "s-status" : "status"); el.textContent = msg; el.className = "status" + (err ? " err" : ""); }
-function showPreview(blob, note) { lastBlob = blob; $("prev-img").src = URL.createObjectURL(blob); $("preview").hidden = false; $("share-now").hidden = !canShareFiles(); if (note) $("prev-note").textContent = note; }
+function showPreview(blob, note) { lastBlob = blob; $("prev-img").src = URL.createObjectURL(blob); $("preview").hidden = false; $("share-now").hidden = !canShareAny(); if (note) $("prev-note").textContent = note; }
 function shareNow(blob) {
   navigator.share({ files: [new File([blob], fileName(), { type: "image/png" })], title: "Valkyrie card" })
     .then(() => setStatus("Shared. Pick Save Image for Photos, or Discord to post it."))
